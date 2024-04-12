@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -e;
+
+KUBE_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token);
+
+labelsPresent="false"
+while [[ "${labelsPresent}" == "false" ]]; do
+  echo "Attempting to label node"
+  body=$(curl -sS --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+    -H "Authorization: Bearer $KUBE_TOKEN" \
+    -H "Accept: application/json" \
+    -H "Content-Type: application/strategic-merge-patch+json" \
+    -X PATCH \
+    -d '{"metadata": {"labels":{"node-role.kubernetes.io/master": "", "node-role.kubernetes.io/control-plane": ""}}}' \
+    https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/nodes/${NODE_NAME}/status;)
+  echo ${body}
+  labelsPresent=$(echo ${body} | jq -r '.metadata.labels | has("node-role.kubernetes.io/master") and has("node-role.kubernetes.io/control-plane")')
+  sleep 5;
+done;
+echo "Node labelled, sleeping..."
+sleep infinity
